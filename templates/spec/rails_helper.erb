@@ -1,0 +1,67 @@
+require 'spec_helper'
+ENV['RAILS_ENV'] ||= 'test'
+require File.expand_path('../../config/environment', __FILE__)
+if Rails.env.production?
+  abort('The Rails environment is running in production mode!')
+end
+
+Dir[Rails.root.join('spec/support/**/*.rb')].each { |f| require f }
+
+require 'rspec/rails'
+require 'simplecov'
+require 'capybara/dsl'
+require 'capybara-screenshot/rspec'
+require 'selenium-webdriver'
+
+SAVE_PATH      = 'public/images/capybara'
+SCREENSHOT_DIR = Rails.root.join(SAVE_PATH)
+DRIVER         = :selenium_chrome
+
+SimpleCov.start
+
+ActiveRecord::Migration.maintain_test_schema!
+
+Capybara.register_driver DRIVER do |app|
+  args = [
+    'headless',
+    'disable-gpu',
+    'no-sandbox',
+    'disable-infobars',
+    'window-size=1920,1080'
+  ]
+  args.delete('headless') if ENV['BROWSER']
+
+  options = Selenium::WebDriver::Chrome::Options.new(
+    args: args
+  )
+
+  Capybara::Selenium::Driver.new(
+    app,
+    browser: :chrome,
+    options: options
+  )
+end
+
+Capybara.javascript_driver        = DRIVER
+Capybara.default_driver           = DRIVER
+Capybara.save_path                = SAVE_PATH
+Capybara.default_max_wait_time    = 10
+Capybara.wait_on_first_by_default = true
+Capybara.ignore_hidden_elements   = false
+
+Capybara::Screenshot.register_driver DRIVER do |driver, path|
+  driver.browser.save_screenshot(path)
+end
+
+RSpec.configure do |config|
+  config.fixture_path = "#{::Rails.root}/spec/fixtures"
+  config.use_transactional_fixtures = true
+  config.infer_spec_type_from_file_location!
+  config.filter_rails_from_backtrace!
+  config.include Capybara::DSL
+  config.include FactoryBot::Syntax::Methods
+  <% if $install_devise %>
+  config.include Devise::Test::ControllerHelpers, type: :controller
+  config.include Devise::Test::IntegrationHelpers, type: :feature
+  <% end %>
+end
